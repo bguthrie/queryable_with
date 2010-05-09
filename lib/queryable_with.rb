@@ -7,15 +7,18 @@ module QueryableWith
   end
   
   module ClassMethods
-    def query_set(set_name, &block)
+    def query_sets
       @query_sets ||= {}.with_indifferent_access
+    end
+    
+    def query_set(set_name, &block)
       set = QueryableWith::QuerySet.new(self)
       set.instance_eval(&block) if block_given?
-      @query_sets[set_name] = set
+      query_sets[set_name] = set
       
       class_eval <<-RUBY
         def self.#{set_name}(params={})
-          @query_sets["#{set_name}"].query(params)
+          self.query_sets["#{set_name}"].query(params)
         end
       RUBY
     end
@@ -28,13 +31,15 @@ module QueryableWith
       @queryables = []
     end
     
-    def queryable_with(expected_parameter)
-      @queryables << QueryableWith::Parameter.new(expected_parameter)
+    def queryable_with(*expected_parameters)
+      @queryables += expected_parameters.map do |parameter|
+        QueryableWith::Parameter.new(parameter)
+      end
     end
     
     def query(params={})
       @queryables.inject(@base_scope) do |scope, queryer|
-        queryer.query(@base_scope, params)
+        queryer.query(scope, params)
       end
     end
     
@@ -43,11 +48,19 @@ module QueryableWith
   class Parameter
     
     def initialize(expected_parameter)
-      @expected_parameter = expected_parameter
+      @expected_parameter = expected_parameter.to_sym
     end
     
     def query(queryer, params={})
-      queryer.scoped(:conditions => params.with_indifferent_access.slice(@expected_parameter))
+      params = params.with_indifferent_access
+      return queryer unless params.has_key?(@expected_parameter)
+      actual_parameter = params[@expected_parameter]
+      
+      if queryer.scopes.keys.include?(@expected_parameter)
+        queryer.send @expected_parameter, actual_parameter
+      else
+        queryer.scoped(:conditions => {@expected_parameter => actual_parameter})
+      end
     end
     
   end
