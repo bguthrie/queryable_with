@@ -1,0 +1,37 @@
+= QueryableWith
+
+An ActiveRecord library for creating scopes on the fly and combining them into reusable sets of scopes. Unlike SearchLogic, this library requires that you declare and map scopes explicitly, and allows you to create multiple scope groupings.
+
+== Goal
+
+  class User < ActiveRecord::Base
+    named_scope :born_after, lambda {|date|
+      { :conditions => ["birthdate >= ?", Date.parse(date)] }
+    }
+  
+    query_set :filter do
+      filter_with_scope :active
+      queryable_with :email
+      queryable_with :born_after, :scope => :born_after
+    end
+  
+    query_set :search do
+      queryable_with :first_name, :last_name, :fuzzy => true
+      queryable_with :username, :column => :email, :fuzzy => true
+    end
+  end
+
+  User.filter
+  #=> User.active
+
+  User.filter(:email => "gthreepwood@gmail.com")
+  #=> User.active.scoped(:conditions => { :email => "gthreepwood@gmail.com" })
+
+  User.filter(:born_after => "04/03/2010", :email => "athreepwood@gmail.com")
+  #=> User.active.born_after("04/03/2010").scoped(:conditions => { :email => "gthreepwood@gmail.com" })
+
+  User.search(:first_name => "Guy", :last_name => "Three") 
+  #=> User.scoped(:conditions => { :first_name => "%Guy%" }).scoped(:conditions => { :last_name => "%Three%" })
+
+  User.search(:username => "gthree")
+  #=> User.scoped(:conditions => { :email => "%gthree%"})
