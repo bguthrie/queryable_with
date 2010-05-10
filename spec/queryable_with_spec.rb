@@ -57,8 +57,21 @@ describe QueryableWith do
     end
     
     it "delegates the underlying filter to a pre-existing named scope if one of that name is defined" do
-      User.named_scope(:first_name) { |name| { :conditions => { :first_name => "%#{name}%" } } }
-      User.query_set(:test) { queryable_with(:first_name) }
+      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
+      User.named_scope(:fname, lambda { |name| { :conditions => { :first_name => name } } })
+      User.query_set(:test) { queryable_with(:fname) }
+      
+      User.test(:fname => "Guybrush").should == [ guybrush ]
+      User.test(:fname => "Herrman").should == [ ]
+    end
+    
+    it "delegates the underlying filter to a pre-existing scope if passed as an option" do
+      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
+      User.named_scope(:fname, lambda { |name| { :conditions => { :first_name => name } } })
+      User.query_set(:test) { queryable_with(:finame, :scope => :fname) }
+      
+      User.test(:finame => "Guybrush").should == [ guybrush ]
+      User.test(:finame => "Herrman").should == [ ]
     end
   end
   
