@@ -35,8 +35,12 @@ module QueryableWith
       options = expected_parameters.extract_options!
       
       @queryables += expected_parameters.map do |parameter|
-        QueryableWith::Parameter.new(parameter, options)
+        QueryableWith::QueryableParameter.new(parameter, options)
       end
+    end
+    
+    def add_scope(scope)
+      @queryables << QueryableWith::AddedScope.new(scope)
     end
     
     def query(params={})
@@ -47,7 +51,23 @@ module QueryableWith
     
   end
   
-  class Parameter
+  class AddedScope
+    
+    def initialize(scope)
+      @scope = scope
+    end
+    
+    def query(queryer, params={})
+      if @scope.is_a? Symbol
+        queryer.send @scope
+      else
+        queryer.scoped @scope
+      end
+    end
+    
+  end
+  
+  class QueryableParameter
     attr_reader :expected_parameter, :scope
     
     def initialize(expected_parameter, options={})

@@ -7,6 +7,7 @@ require 'queryable_with'
 ActiveRecord::Base.configurations = true
 ActiveRecord::Schema.verbose = false
 ActiveRecord::Base.establish_connection(:adapter => "sqlite3", :database => ":memory:")
+
 ActiveRecord::Schema.define(:version => 1) do
   create_table :users do |t|
     t.string   "first_name"
@@ -17,6 +18,7 @@ ActiveRecord::Schema.define(:version => 1) do
     t.integer  "income"
     t.integer  "employer_id"
     t.string   "type"
+    t.boolean  "active"
   end
   
   create_table :employers do |t|
@@ -24,4 +26,11 @@ ActiveRecord::Schema.define(:version => 1) do
     t.string "email"
     t.timestamps
   end
+end
+
+class User < ActiveRecord::Base
+  belongs_to :employer
+end
+
+class Employer < ActiveRecord::Base
 end

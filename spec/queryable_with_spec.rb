@@ -9,9 +9,6 @@ describe QueryableWith do
     ActiveRecord::Base.ancestors.should include(QueryableWith)
   end
   
-  class User < ActiveRecord::Base
-  end
-  
   describe "query_set" do
     it "exposes a new method named after the defined query set" do
       User.query_set :test
@@ -72,6 +69,25 @@ describe QueryableWith do
       
       User.test(:finame => "Guybrush").should == [ guybrush ]
       User.test(:finame => "Herrman").should == [ ]
+    end
+  end
+  
+  describe "add_scope" do
+    it "adds the named scope to every query" do
+      active   = User.create! :active => true
+      inactive = User.create! :active => false
+      User.named_scope(:only_active, :conditions => { :active => true })
+      User.query_set(:test) { add_scope(:only_active) }
+
+      User.test.all.should == [ active ]
+    end
+    
+    it "adds the ad hoc scope to every query" do
+      active   = User.create! :active => true
+      inactive = User.create! :active => false
+      User.query_set(:test) { add_scope(:conditions => { :active => true }) }
+
+      User.test.all.should == [ active ]
     end
   end
   
