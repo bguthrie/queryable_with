@@ -2,21 +2,35 @@
 
 An ActiveRecord library for creating scopes on the fly and combining them into reusable sets of scopes. Unlike SearchLogic, this library requires that you declare and map scopes explicitly, and allows you to create multiple scope groupings.
 
-== Goal
+== Example
 
   class User < ActiveRecord::Base
     named_scope :born_after, lambda {|date|
       { :conditions => ["birthdate >= ?", Date.parse(date)] }
     }
+    
+    named_scope :active, :conditions => { :active => true }
   
     query_set :filter do
-      filter_with_scope :active
+      # User.active
+      add_scope :active
+
+      # If queried by :born_after, use the defined scope.
+      # User.born_after(params[:born_after])
+      queryable_with :born_after # Filters on born_after scope.
+
+      # If queried by :email, use the column, as no scope is defined.
+      # User.scoped(:conditions => { :email => params[:email] })
       queryable_with :email
-      queryable_with :born_after, :scope => :born_after
     end
   
     query_set :search do
+      # If queried by either :first_name or :last_name, execute a LIKE query on those columns.
+      # User.scoped(:conditions => ["(users.first_name LIKE ?) OR (users.last_name LIKE ?)", ...])
       queryable_with :first_name, :last_name, :wildcard => true
+      
+      # If queried by :username, execute a LIKE query on the the email column.
+      # User.scoped(:conditions => ["(users.email LIKE ?)", ...])      
       queryable_with :username, :column => :email, :wildcard => true
     end
   end
@@ -35,3 +49,26 @@ An ActiveRecord library for creating scopes on the fly and combining them into r
 
   User.search(:username => "gthree")
   #=> User.scoped(:conditions => { :email => "%gthree%"})
+
+== License
+
+Copyright (c) 2010 Brian Guthrie
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
