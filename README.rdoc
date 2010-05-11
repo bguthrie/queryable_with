@@ -16,8 +16,8 @@ An ActiveRecord library for creating scopes on the fly and combining them into r
     end
   
     query_set :search do
-      queryable_with :first_name, :last_name, :fuzzy => true
-      queryable_with :username, :column => :email, :fuzzy => true
+      queryable_with :first_name, :last_name, :wildcard => true
+      queryable_with :username, :column => :email, :wildcard => true
     end
   end
 

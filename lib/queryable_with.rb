@@ -71,12 +71,12 @@ module QueryableWith
     attr_reader :expected_parameter
     
     def initialize(expected_parameter, options={})
-      @scope, @fuzzy = options.values_at(:scope, :fuzzy)
+      @scope, @wildcard = options.values_at(:scope, :wildcard)
       @expected_parameter = expected_parameter.to_sym
     end
     
     def scoped?; !@scope.blank?; end
-    def fuzzy?; @fuzzy == true; end
+    def wildcard?; @wildcard == true; end
     def column_name; @expected_parameter.to_s; end
     
     def query(queryer, params={})
@@ -100,14 +100,14 @@ module QueryableWith
       end
       
       def conditions_for(queryer, value)
-        query_string = if fuzzy?
+        query_string = if wildcard?
           "(#{queryer.table_name}.#{self.column_name} LIKE ?)"
         else
           "(#{queryer.table_name}.#{self.column_name} = ?)"
         end
         
         final_values = Array(value).map do |value|
-          fuzzy? ? "%#{value}%" : value
+          wildcard? ? "%#{value}%" : value
         end
         
         final_query_string = ( [ query_string ] * final_values.size ).join(" OR ")

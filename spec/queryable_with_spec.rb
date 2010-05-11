@@ -79,10 +79,10 @@ describe QueryableWith do
       User.test(:finame => "Herrman").should == [ ]
     end
     
-    describe ":fuzzy => true" do
+    describe ":wildcard => true" do
       it "wildcards the given value" do
         guybrush = User.create! :first_name => "Guybrush"
-        User.query_set(:test) { queryable_with(:first_name, :fuzzy => true) }
+        User.query_set(:test) { queryable_with(:first_name, :wildcard => true) }
         
         User.test(:first_name => "uybru").should == [ guybrush ]
         User.test(:first_name => "Elaine").should == [ ]
@@ -91,7 +91,7 @@ describe QueryableWith do
       it "ORs multiple wildcarded values" do
         guybrush = User.create! :first_name => "Guybrush"
         elaine   = User.create! :first_name => "Elaine"
-        User.query_set(:test) { queryable_with(:first_name, :fuzzy => true) }
+        User.query_set(:test) { queryable_with(:first_name, :wildcard => true) }
         
         User.test(:first_name => ["uybru", "lain"]).should include(guybrush, elaine)
       end
