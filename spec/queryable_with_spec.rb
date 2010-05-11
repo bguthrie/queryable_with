@@ -39,6 +39,14 @@ describe QueryableWith do
       User.test(:last_name => "Threepwood").should include(guybrush, elaine)
     end
     
+    it "selects any one of a given list of values" do
+      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
+      elaine   = User.create! :first_name => "Elaine", :last_name => "Threepwood"
+      User.query_set(:test) { queryable_with(:first_name, :last_name) }
+      
+      User.test(:first_name => ["Guybrush", "Elaine"]).should include(guybrush, elaine)
+    end
+    
     it "returns the receiver if queried with an empty set of params" do
       User.query_set(:test) { queryable_with(:first_name, :last_name) }
       User.test.should == User
@@ -70,10 +78,28 @@ describe QueryableWith do
       User.test(:finame => "Guybrush").should == [ guybrush ]
       User.test(:finame => "Herrman").should == [ ]
     end
+    
+    describe ":fuzzy => true" do
+      it "wildcards the given value" do
+        guybrush = User.create! :first_name => "Guybrush"
+        User.query_set(:test) { queryable_with(:first_name, :fuzzy => true) }
+        
+        User.test(:first_name => "uybru").should == [ guybrush ]
+        User.test(:first_name => "Elaine").should == [ ]
+      end
+      
+      it "ORs multiple wildcarded values" do
+        guybrush = User.create! :first_name => "Guybrush"
+        elaine   = User.create! :first_name => "Elaine"
+        User.query_set(:test) { queryable_with(:first_name, :fuzzy => true) }
+        
+        User.test(:first_name => ["uybru", "lain"]).should include(guybrush, elaine)
+      end
+    end
   end
   
   describe "add_scope" do
-    it "adds the named scope to every query" do
+    it "adds the given named scope to every query" do
       active   = User.create! :active => true
       inactive = User.create! :active => false
       User.named_scope(:only_active, :conditions => { :active => true })
@@ -82,7 +108,7 @@ describe QueryableWith do
       User.test.all.should == [ active ]
     end
     
-    it "adds the ad hoc scope to every query" do
+    it "adds the given ad hoc scope to every query" do
       active   = User.create! :active => true
       inactive = User.create! :active => false
       User.query_set(:test) { add_scope(:conditions => { :active => true }) }

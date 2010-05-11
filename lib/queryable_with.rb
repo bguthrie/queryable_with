@@ -8,11 +8,11 @@ module QueryableWith
   
   module ClassMethods
     def query_sets
-      @query_sets ||= {}.with_indifferent_access
+      @query_sets ||= {}
     end
     
     def query_set(set_name, &block)
-      query_sets[set_name] = QueryableWith::QuerySet.new(self).tap do |set|
+      query_sets[set_name.to_s] = QueryableWith::QuerySet.new(self).tap do |set|
         set.instance_eval(&block) if block_given?
       end
       
@@ -68,14 +68,16 @@ module QueryableWith
   end
   
   class QueryableParameter
-    attr_reader :expected_parameter, :scope
+    attr_reader :expected_parameter
     
     def initialize(expected_parameter, options={})
-      @scope = options[:scope]
+      @scope, @fuzzy = options.values_at(:scope, :fuzzy)
       @expected_parameter = expected_parameter.to_sym
     end
     
-    def scoped?; !scope.blank?; end
+    def scoped?; !@scope.blank?; end
+    def fuzzy?; @fuzzy == true; end
+    def column_name; @expected_parameter.to_s; end
     
     def query(queryer, params={})
       params = params.with_indifferent_access
@@ -83,11 +85,11 @@ module QueryableWith
       actual_parameter = params[@expected_parameter]
       
       if scoped? 
-        queryer.send scope, actual_parameter
+        queryer.send @scope, actual_parameter
       elsif queryer_scoped?(queryer)
         queryer.send expected_parameter, actual_parameter
       else
-        queryer.scoped(:conditions => { expected_parameter => actual_parameter })
+        queryer.scoped(:conditions => conditions_for(queryer, actual_parameter))
       end
     end
     
@@ -95,6 +97,22 @@ module QueryableWith
     
       def queryer_scoped?(queryer)
         queryer.scopes.keys.include?(@expected_parameter)
+      end
+      
+      def conditions_for(queryer, value)
+        query_string = if fuzzy?
+          "(#{queryer.table_name}.#{self.column_name} LIKE ?)"
+        else
+          "(#{queryer.table_name}.#{self.column_name} = ?)"
+        end
+        
+        final_values = Array(value).map do |value|
+          fuzzy? ? "%#{value}%" : value
+        end
+        
+        final_query_string = ( [ query_string ] * final_values.size ).join(" OR ")
+        
+        [ final_query_string ] + final_values
       end
     
   end
