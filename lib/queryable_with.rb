@@ -31,11 +31,11 @@ module QueryableWith
       @queryables = []
     end
     
-    def queryable_with(*expected_parameters)
+    def queryable_with(*expected_parameters, &block)
       options = expected_parameters.extract_options!
       
       @queryables += expected_parameters.map do |parameter|
-        QueryableWith::QueryableParameter.new(parameter, options)
+        QueryableWith::QueryableParameter.new(parameter, options, &block)
       end
     end
     
@@ -70,10 +70,11 @@ module QueryableWith
   class QueryableParameter
     attr_reader :expected_parameter, :column_name
     
-    def initialize(expected_parameter, options={})
+    def initialize(expected_parameter, options={}, &block)
       @scope, @wildcard = options.values_at(:scope, :wildcard)
       @expected_parameter = expected_parameter.to_sym
       @column_name = options[:column] || @expected_parameter.to_s
+      @value_mapper = block || lambda {|o| o}
     end
     
     def scoped?; !@scope.blank?; end
@@ -82,7 +83,7 @@ module QueryableWith
     def query(queryer, params={})
       params = params.with_indifferent_access
       return queryer unless params.has_key?(@expected_parameter)
-      actual_parameter = params[@expected_parameter]
+      actual_parameter = @value_mapper.call(params[@expected_parameter])
       
       if scoped? 
         queryer.send @scope, actual_parameter

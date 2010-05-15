@@ -117,6 +117,32 @@ describe QueryableWith do
       end
     end
     
+    describe "with a block" do
+      it "permits you to transform the incoming value with a standard column lookup" do
+        guybrush = User.create! :name => "Guybrush"
+        elaine   = User.create! :name => "Elaine"
+        User.query_set(:test) { queryable_with(:name) { |str| str.gsub(/fawkes/, "brush") } }
+        
+        User.test(:name => "Guyfawkes").should == [ guybrush ]
+      end
+      
+      it "permits you to transform the incoming value with a scope" do
+        guybrush1 = User.create! :name => "Guybrush", :employer => Employer.create!(:name => "Threepwood Nautical Services LLC")
+        guybrush2 = User.create! :name => "Guybrush", :employer => Employer.create!(:name => "LeChuck LeLumber, Inc.")
+        
+        User.named_scope :by_employer, lambda { |employer| 
+          { :conditions => { :employer_id => employer } } 
+        }
+        
+        User.query_set(:test) do
+          queryable_with :employer_name, :scope => :by_employer do |name|
+            Employer.find_by_name(name)
+          end
+        end
+        
+        User.test(:employer_name => "Threepwood Nautical Services LLC").should == [ guybrush1 ]
+      end
+    end
   end
   
   describe "add_scope" do
