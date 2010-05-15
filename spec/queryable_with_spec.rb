@@ -3,6 +3,7 @@ require File.dirname(__FILE__) + "/spec_helper"
 describe QueryableWith do
   before :each do
     User.delete_all
+    User.query_sets.clear
   end
   
   it "includes itself in ActiveRecord" do
@@ -171,6 +172,28 @@ describe QueryableWith do
       User.query_set(:test) { add_scope(:conditions => { :active => true }) }
       
       User.test.all.should == [ active ]
+    end
+  end
+  
+  describe "after subclassing" do
+    it "inherits the query sets from its superclass" do
+      User.query_set(:test) { add_scope(:conditions => { :active => true }) }
+      class Pirate < User; end
+      active   = Pirate.create! :active => true
+      inactive = Pirate.create! :active => false
+      
+      Pirate.test.should == [ active ]
+    end
+    
+    it "allows query sets to be extended by the subclass" do
+      User.query_set(:test) { add_scope(:conditions => { :active => true }) }
+      class Pirate < User; end
+      Pirate.query_set(:test) { add_scope(:conditions => { :name => "Guybrush" }) }
+      
+      active_guy   = Pirate.create! :name => "Guybrush", :active => true
+      inactive_guy = Pirate.create! :name => "Guybrush", :active => false
+      
+      Pirate.test.should == [ active_guy ]
     end
   end
   

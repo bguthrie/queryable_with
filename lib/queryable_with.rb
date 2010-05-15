@@ -8,26 +8,29 @@ module QueryableWith
   
   module ClassMethods
     def query_sets
-      @query_sets ||= {}
+      read_inheritable_attribute(:query_sets) || write_inheritable_hash(:query_sets, {})
     end
     
     def query_set(set_name, &block)
-      query_sets[set_name.to_s] = QueryableWith::QuerySet.new(self).tap do |set|
-        set.instance_eval(&block) if block_given?
-      end
+      set = query_set_for(set_name).tap { |s| s.instance_eval(&block) if block_given? }
       
       class_eval <<-RUBY
         def self.#{set_name}(params={})
-          self.query_sets["#{set_name}"].query(params)
+          self.query_sets["#{set_name}"].query(self, params)
         end
       RUBY
     end
+    
+    protected
+    
+      def query_set_for(set_name)
+        query_sets[set_name.to_s] || query_sets.store(set_name.to_s, QueryableWith::QuerySet.new)
+      end
   end
   
   class QuerySet
     
-    def initialize(base_scope)
-      @base_scope = base_scope
+    def initialize
       @queryables = []
     end
     
@@ -43,8 +46,8 @@ module QueryableWith
       @queryables << QueryableWith::AddedScope.new(scope)
     end
     
-    def query(params={})
-      @queryables.inject(@base_scope) do |scope, queryer|
+    def query(base_scope, params={})
+      @queryables.inject(base_scope) do |scope, queryer|
         queryer.query(scope, params)
       end
     end
