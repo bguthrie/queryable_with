@@ -71,7 +71,7 @@ module QueryableWith
     attr_reader :expected_parameter, :column_name
     
     def initialize(expected_parameter, options={}, &block)
-      @scope, @wildcard = options.values_at(:scope, :wildcard)
+      @scope, @wildcard, @default_value = options.values_at(:scope, :wildcard, :default)
       @expected_parameter = expected_parameter.to_sym
       @column_name = options[:column] || @expected_parameter.to_s
       @value_mapper = block || lambda {|o| o}
@@ -79,22 +79,29 @@ module QueryableWith
     
     def scoped?; !@scope.blank?; end
     def wildcard?; @wildcard == true; end
+    def scope_name; @scope || self.expected_parameter; end
     
     def query(queryer, params={})
       params = params.with_indifferent_access
-      return queryer unless params.has_key?(@expected_parameter)
-      actual_parameter = @value_mapper.call(params[@expected_parameter])
+      return queryer unless should_apply_to?(params)
       
-      if scoped? 
-        queryer.send @scope, actual_parameter
-      elsif queryer_scoped?(queryer)
-        queryer.send expected_parameter, actual_parameter
+      if scoped? || queryer_scoped?(queryer)
+        queryer.send scope_name, queried_parameter(params)
       else
-        queryer.scoped(:conditions => conditions_for(queryer, actual_parameter))
+        queryer.scoped(:conditions => conditions_for(queryer, queried_parameter(params)))
       end
     end
     
     protected
+    
+      def should_apply_to?(params)
+        params.has_key?(@expected_parameter) || !@default_value.blank?
+      end
+      
+      def queried_parameter(params)
+        relevant_param = params[@expected_parameter].nil? ? @default_value : params[@expected_parameter]
+        @value_mapper.call(relevant_param)
+      end
     
       def queryer_scoped?(queryer)
         queryer.scopes.keys.include?(@expected_parameter)

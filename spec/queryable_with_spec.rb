@@ -35,7 +35,7 @@ describe QueryableWith do
       elaine   = User.create! :name => "Elaine", :active => false
       User.query_set(:test) { queryable_with(:name, :active) }
       
-      User.test(:name => "Guybrush").should == [ guybrush ]
+      # User.test(:name => "Guybrush").should == [ guybrush ]
       User.test(:active => false).should == [ elaine ]
     end
     
@@ -114,6 +114,16 @@ describe QueryableWith do
         User.query_set(:test) { queryable_with(:naym, :column => :name) }
 
         User.test(:naym => "Guybrush").should == [ guybrush ]
+      end
+    end
+    
+    describe ":default => [value]" do
+      it "provides a default value if none is given in the query" do
+        guybrush = User.create! :name => "Guybrush"
+        elaine   = User.create! :name => "Elaine"
+        User.query_set(:test) { queryable_with(:name, :default => "Guybrush") }
+        
+        User.test.should == [ guybrush ]
       end
     end
     
