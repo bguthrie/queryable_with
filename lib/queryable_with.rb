@@ -58,8 +58,10 @@ module QueryableWith
     #   scope), a Hash (scope conditions) or a lambda.
     # * <tt>column</tt> - Map the incoming parameter to this column.
     # * <tt>default</tt> - Default the incoming parameter to this value even if it isn't provided.
-    # * <tt>wildcard</tt> - Use a SQL LIKE query with the incoming parameter. Used only if the <tt>scope</tt>
-    #   option is absent or a block is not provided.
+    # * <tt>wildcard</tt> - If true, generate a SQL LIKE query with the incoming parameter. Used only 
+    #   if the <tt>scope</tt> option is absent or a block is not provided.
+    # * <tt>allow_blank</tt> - If true, treat incoming parameters mapped to nil or a blank string as
+    #   IS NULL for the purposes of SQL query generation. Used only if the <tt>scope</tt> option is absent.
     #
     # If a block is provided, incoming parameters to the query will be passed through that function first. 
     # For example,
@@ -94,7 +96,7 @@ module QueryableWith
     def query(base_scope, params={}) # :nodoc:
       @queryables.inject(base_scope) do |scope, queryer|
         queryer.query(scope, params)
-      end
+      end.scoped({})
     end
     
   end
@@ -119,7 +121,7 @@ module QueryableWith
     attr_reader :expected_parameter, :column_name
     
     def initialize(expected_parameter, options={}, &block)
-      @scope, @wildcard, @default_value = options.values_at(:scope, :wildcard, :default)
+      @scope, @wildcard, @default_value, @allow_blank = options.values_at(:scope, :wildcard, :default, :allow_blank)
       @expected_parameter = expected_parameter.to_sym
       @column_name = options[:column] || @expected_parameter.to_s
       @value_mapper = block || lambda {|o| o}
@@ -127,28 +129,38 @@ module QueryableWith
     
     def scoped?; !@scope.blank?; end
     def wildcard?; @wildcard == true; end
+    def blank_allowed?; @allow_blank == true; end
+    def has_default?; !@default_value.nil?; end
     def scope_name; @scope || self.expected_parameter; end
     
     def query(queryer, params={})
       params = params.with_indifferent_access
-      return queryer unless should_apply_to?(params)
+      params_contain_queryable_value, queried_value = determine_queried_value(params[@expected_parameter])
+      
+      return queryer unless params_contain_queryable_value
+      queried_value = @value_mapper.call(queried_value)
       
       if scoped? || queryer_scoped?(queryer)
-        queryer.send scope_name, queried_parameter(params)
+        queryer.send scope_name, queried_value
       else
-        queryer.scoped(:conditions => conditions_for(queryer, queried_parameter(params)))
+        queryer.scoped(:conditions => conditions_for(queryer, queried_value))
       end
     end
     
     protected
     
-      def should_apply_to?(params)
-        params.has_key?(@expected_parameter) || !@default_value.blank?
-      end
-      
-      def queried_parameter(params)
-        relevant_param = params[@expected_parameter].nil? ? @default_value : params[@expected_parameter]
-        @value_mapper.call(relevant_param)
+      def determine_queried_value(value_in_params)
+        if value_in_params.blank? && value_in_params != false
+          if blank_allowed?
+            return true, nil
+          elsif has_default?
+            return true, @default_value
+          else
+            return false, nil
+          end
+        else
+          return true, value_in_params
+        end
       end
     
       def queryer_scoped?(queryer)
@@ -162,7 +174,7 @@ module QueryableWith
           "(#{queryer.table_name}.#{self.column_name} = ?)"
         end
         
-        final_values = Array(value).map do |value|
+        final_values = [ value ].flatten.map do |value|
           wildcard? ? "%#{value}%" : value
         end
         

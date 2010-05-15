@@ -16,9 +16,9 @@ describe QueryableWith do
       User.methods.should include("test")
     end
     
-    it "returns the receiver if no params to filter are passed" do
+    it "returns a scope that points to an empty result set if the query set is empty" do
       User.query_set :test
-      User.test.should == User
+      User.test.should == [ ]
     end
     
     describe ":parent => [query_set_name]" do
@@ -80,9 +80,9 @@ describe QueryableWith do
       User.test(:name => ["Guybrush", "Elaine"]).should include(guybrush, elaine)
     end
     
-    it "returns the receiver if queried with an empty set of params" do
+    it "returns a scope that points to an empty result set if queried with an empty set of params" do
       User.query_set(:test) { queryable_with(:name) }
-      User.test.should == User
+      User.test.should == [ ]
     end
     
     it "applies multiple parameters if multiple parameters are queried" do
@@ -100,6 +100,13 @@ describe QueryableWith do
       
       User.test(:naym => "Guybrush").should == [ guybrush ]
       User.test(:naym => "Herrman").should == [ ]
+    end
+    
+    it "ignores blank values" do
+      guybrush = User.create! :name => "Guybrush"
+      User.query_set(:test) { queryable_with(:name) }
+      User.test(:name => "").should == [ guybrush ]
+      User.test(:name => nil).should == [ guybrush ]
     end
     
     describe ":scope => [scope_name]" do
@@ -151,6 +158,15 @@ describe QueryableWith do
       end
     end
     
+    describe ":allow_blank => [boolean]" do
+      it "accepts, and queries on, blank values" do
+        guybrush = User.create! :name => "Guybrush"
+        User.query_set(:test) { queryable_with(:name, :allow_blank => true) }
+        User.test(:name => "").should == [ ]
+        User.test(:name => nil).should == [ ]
+      end
+    end
+    
     describe "with a block" do
       it "permits you to transform the incoming value with a standard column lookup" do
         guybrush = User.create! :name => "Guybrush"
@@ -198,7 +214,7 @@ describe QueryableWith do
     end
   end
   
-  describe "after subclassing" do
+  describe "(subclassed)" do
     it "inherits the query sets from its superclass" do
       User.query_set(:test) { add_scope(:conditions => { :active => true }) }
       class Pirate < User; end
