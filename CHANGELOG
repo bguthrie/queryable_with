@@ -1,0 +1,5 @@
+= QueryableWith Changelog
+
+== 0.1.0
+
+ * First release. Supports query_set, queryable_with, and default_scope.
