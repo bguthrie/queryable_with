@@ -23,79 +23,100 @@ describe QueryableWith do
   
   describe "queryable_with" do
     it "maps a parameter directly to a column" do
-      guybrush = User.create! :first_name => "Guybrush"
-      elaine   = User.create! :first_name => "Elaine"
-      User.query_set(:test) { queryable_with(:first_name) }
+      guybrush = User.create! :name => "Guybrush"
+      elaine   = User.create! :name => "Elaine"
+      User.query_set(:test) { queryable_with(:name) }
       
-      User.test(:first_name => "Guybrush").should == [ guybrush ]
+      User.test(:name => "Guybrush").should == [ guybrush ]
     end
     
     it "maps multiple parameters, each to their own column" do
-      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
-      elaine   = User.create! :first_name => "Elaine", :last_name => "Threepwood"
-      User.query_set(:test) { queryable_with(:first_name, :last_name) }
+      guybrush = User.create! :name => "Guybrush", :active => true
+      elaine   = User.create! :name => "Elaine", :active => false
+      User.query_set(:test) { queryable_with(:name, :active) }
       
-      User.test(:first_name => "Guybrush").should == [ guybrush ]
-      User.test(:last_name => "Threepwood").should include(guybrush, elaine)
+      User.test(:name => "Guybrush").should == [ guybrush ]
+      User.test(:active => false).should == [ elaine ]
+    end
+    
+    it "uses the correct table name when referring to columns with potentially conflicting names" do
+      # The employers table also has a name column.
+      User.query_set(:test) { queryable_with(:name) }
+      
+      lambda do
+        User.test(:name => "Guybrush").all(:joins => :employer)
+      end.should_not raise_error(ActiveRecord::StatementInvalid)
     end
     
     it "selects any one of a given list of values" do
-      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
-      elaine   = User.create! :first_name => "Elaine", :last_name => "Threepwood"
-      User.query_set(:test) { queryable_with(:first_name, :last_name) }
+      guybrush = User.create! :name => "Guybrush"
+      elaine   = User.create! :name => "Elaine"
+      User.query_set(:test) { queryable_with(:name) }
       
-      User.test(:first_name => ["Guybrush", "Elaine"]).should include(guybrush, elaine)
+      User.test(:name => ["Guybrush", "Elaine"]).should include(guybrush, elaine)
     end
     
     it "returns the receiver if queried with an empty set of params" do
-      User.query_set(:test) { queryable_with(:first_name, :last_name) }
+      User.query_set(:test) { queryable_with(:name) }
       User.test.should == User
     end
     
     it "applies multiple parameters if multiple parameters are queried" do
-      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
-      elaine   = User.create! :first_name => "Elaine", :last_name => "Threepwood"
-      herrman  = User.create! :first_name => "Herrman", :last_name => "Toothrot"
-      User.query_set(:test) { queryable_with(:first_name, :last_name) }
+      active_bob = User.create! :name => "Bob", :active => true
+      lazy_bob   = User.create! :name => "Bob", :active => false
+      User.query_set(:test) { queryable_with(:name, :active) }
       
-      User.test(:first_name => "Guybrush", :last_name => "Threepwood").should == [ guybrush ]
+      User.test(:name => "Bob", :active => true).should == [ active_bob ]
     end
     
     it "delegates the underlying filter to a pre-existing named scope if one of that name is defined" do
-      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
-      User.named_scope(:fname, lambda { |name| { :conditions => { :first_name => name } } })
-      User.query_set(:test) { queryable_with(:fname) }
+      guybrush = User.create! :name => "Guybrush"
+      User.named_scope(:naym, lambda { |name| { :conditions => { :name => name } } })
+      User.query_set(:test) { queryable_with(:naym) }
       
-      User.test(:fname => "Guybrush").should == [ guybrush ]
-      User.test(:fname => "Herrman").should == [ ]
+      User.test(:naym => "Guybrush").should == [ guybrush ]
+      User.test(:naym => "Herrman").should == [ ]
     end
     
-    it "delegates the underlying filter to a pre-existing scope if passed as an option" do
-      guybrush = User.create! :first_name => "Guybrush", :last_name => "Threepwood"
-      User.named_scope(:fname, lambda { |name| { :conditions => { :first_name => name } } })
-      User.query_set(:test) { queryable_with(:finame, :scope => :fname) }
+    describe ":scope => [scope_name]" do
+      it "delegates the underlying filter to a pre-existing scope if passed as an option" do
+        guybrush = User.create! :name => "Guybrush"
+        User.named_scope(:naym, lambda { |name| { :conditions => { :name => name } } })
+        User.query_set(:test) { queryable_with(:nizame, :scope => :naym) }
       
-      User.test(:finame => "Guybrush").should == [ guybrush ]
-      User.test(:finame => "Herrman").should == [ ]
+        User.test(:nizame => "Guybrush").should == [ guybrush ]
+        User.test(:nizame => "Herrman").should == [ ]
+      end
     end
     
     describe ":wildcard => true" do
       it "wildcards the given value" do
-        guybrush = User.create! :first_name => "Guybrush"
-        User.query_set(:test) { queryable_with(:first_name, :wildcard => true) }
+        guybrush = User.create! :name => "Guybrush"
+        User.query_set(:test) { queryable_with(:name, :wildcard => true) }
         
-        User.test(:first_name => "uybru").should == [ guybrush ]
-        User.test(:first_name => "Elaine").should == [ ]
+        User.test(:name => "uybru").should == [ guybrush ]
+        User.test(:name => "Elaine").should == [ ]
       end
       
       it "ORs multiple wildcarded values" do
-        guybrush = User.create! :first_name => "Guybrush"
-        elaine   = User.create! :first_name => "Elaine"
-        User.query_set(:test) { queryable_with(:first_name, :wildcard => true) }
+        guybrush = User.create! :name => "Guybrush"
+        elaine   = User.create! :name => "Elaine"
+        User.query_set(:test) { queryable_with(:name, :wildcard => true) }
         
-        User.test(:first_name => ["uybru", "lain"]).should include(guybrush, elaine)
+        User.test(:name => ["uybru", "lain"]).should include(guybrush, elaine)
       end
     end
+    
+    describe ":column => [column_name]" do
+      it "maps the parameter to the given column name" do
+        guybrush = User.create! :name => "Guybrush"
+        elaine   = User.create! :name => "Elaine"
+        User.query_set(:test) { queryable_with(:naym, :column => :name) }
+
+        User.test(:naym => "Guybrush").should == [ guybrush ]
+      end
+    end
+    
   end
   
   describe "add_scope" do
@@ -112,7 +133,7 @@ describe QueryableWith do
       active   = User.create! :active => true
       inactive = User.create! :active => false
       User.query_set(:test) { add_scope(:conditions => { :active => true }) }
-
+      
       User.test.all.should == [ active ]
     end
   end

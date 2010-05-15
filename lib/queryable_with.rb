@@ -68,16 +68,16 @@ module QueryableWith
   end
   
   class QueryableParameter
-    attr_reader :expected_parameter
+    attr_reader :expected_parameter, :column_name
     
     def initialize(expected_parameter, options={})
       @scope, @wildcard = options.values_at(:scope, :wildcard)
       @expected_parameter = expected_parameter.to_sym
+      @column_name = options[:column] || @expected_parameter.to_s
     end
     
     def scoped?; !@scope.blank?; end
     def wildcard?; @wildcard == true; end
-    def column_name; @expected_parameter.to_s; end
     
     def query(queryer, params={})
       params = params.with_indifferent_access

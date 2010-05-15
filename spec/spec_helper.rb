@@ -4,14 +4,15 @@ $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 require 'spec'
 require 'queryable_with'
 
+LOGFILE = File.open(File.dirname(__FILE__) + '/../tmp/database.log', 'a')
+ActiveRecord::Base.logger = Logger.new(LOGFILE)
 ActiveRecord::Base.configurations = true
 ActiveRecord::Schema.verbose = false
 ActiveRecord::Base.establish_connection(:adapter => "sqlite3", :database => ":memory:")
 
 ActiveRecord::Schema.define(:version => 1) do
   create_table :users do |t|
-    t.string   "first_name"
-    t.string   "last_name"
+    t.string   "name"
     t.date     "birthdate"
     t.string   "email"
     t.string   "join_date"
