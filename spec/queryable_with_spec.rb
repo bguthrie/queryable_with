@@ -20,6 +20,29 @@ describe QueryableWith do
       User.query_set :test
       User.test.should == User
     end
+    
+    describe ":parent => [query_set_name]" do
+      it "applies a parent set that adds a scope" do
+        User.query_set(:test)                        { add_scope(:conditions => { :active => true }) }
+        User.query_set(:supertest, :parent => :test) { add_scope(:conditions => { :name => "Guybrush" }) }
+
+        active_guy   = User.create! :name => "Guybrush", :active => true
+        inactive_guy = User.create! :name => "Guybrush", :active => false
+
+        User.supertest.should == [ active_guy ]
+      end
+
+      it "applies a parent set that is itself queryable" do
+        User.query_set(:test)                        { queryable_with(:name) }
+        User.query_set(:supertest, :parent => :test) { add_scope(:conditions => { :active => true }) }
+
+        active_guy   = User.create! :name => "Guybrush", :active => true
+        inactive_guy = User.create! :name => "Guybrush", :active => false
+        active_gal   = User.create! :name => "Elaine",   :active => true
+
+        User.supertest(:name => "Guybrush").should == [ active_guy ]
+      end
+    end
   end
   
   describe "queryable_with" do

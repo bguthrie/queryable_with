@@ -11,8 +11,8 @@ module QueryableWith
       read_inheritable_attribute(:query_sets) || write_inheritable_hash(:query_sets, {})
     end
     
-    def query_set(set_name, &block)
-      set = query_set_for(set_name).tap { |s| s.instance_eval(&block) if block_given? }
+    def query_set(set_name, options={}, &block)
+      set = query_set_for(set_name, options).tap { |s| s.instance_eval(&block) if block_given? }
       
       class_eval <<-RUBY
         def self.#{set_name}(params={})
@@ -23,15 +23,19 @@ module QueryableWith
     
     protected
     
-      def query_set_for(set_name)
-        query_sets[set_name.to_s] || query_sets.store(set_name.to_s, QueryableWith::QuerySet.new)
+      def query_set_for(set_name, options)
+        query_sets[set_name.to_s] || query_sets.store(set_name.to_s, QueryableWith::QuerySet.new(options))
       end
   end
   
   class QuerySet
     
-    def initialize
+    def initialize(options={})
       @queryables = []
+      
+      if options.has_key?(:parent)
+        @queryables << QueryableWith::AddedScope.new(options[:parent])
+      end
     end
     
     def queryable_with(*expected_parameters, &block)
@@ -62,7 +66,7 @@ module QueryableWith
     
     def query(queryer, params={})
       if @scope.is_a? Symbol
-        queryer.send @scope
+        queryer.send @scope, params
       else
         queryer.scoped @scope
       end
