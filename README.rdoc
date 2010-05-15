@@ -1,33 +1,48 @@
 = QueryableWith
 
-An ActiveRecord library for creating scopes on the fly and combining them into reusable sets of scopes. Unlike SearchLogic, this library requires that you declare and map scopes explicitly, and allows you to create multiple scope groupings.
+QueryableWith is an ActiveRecord library for creating and combining reusable sets of scopes. Instead of building up
+your query using if-conditions checking for the existence of certain parameters--a common use case in reporting and
+controller query logic--QueryableWith combines them together, and only uses the ones the params you pass need.
 
-== Example
+For example,
 
   class User < ActiveRecord::Base
     named_scope :born_after, lambda {|date|
-      { :conditions => ["birthdate >= ?", Date.parse(date)] }
+      { :conditions => ["birthdate >= ?", date] }
     }
-    
-    named_scope :active, :conditions => { :active => true }
-  
+
+   named_scope :active, :conditions => { :active => true }
+
     query_set :filter do
-      # User.active
       add_scope :active
-
-      # If queried by :born_after, use the defined scope.
-      # User.born_after(params[:born_after])
-      queryable_with :born_after # Filters on born_after scope.
-
-      # If queried by :email, use the column, as no scope is defined.
-      # User.scoped(:conditions => { :email => params[:email] })
       queryable_with :email
+      queryable_with(:born_after) { |d| Date.parse(d) }
     end
-  
+  end
+
+will add a method, <tt>User.filter</tt>, that knows how to filter on the <tt>email</tt> and <tt>born_after</tt>
+parameters by, respectively, performing an equality search against that column, and using the defined name
+scope (after passing the given date value, in this case a string, through the block). It will always add the
+<tt>active</tt> scope. For example,
+
+  User.filter
+  #=> User.active
+
+  User.filter(:email => "gthreepwood@melee.gov") 
+  #=> User.active.scoped(:conditions => { :email => "gthreepwood@melee.gov"})
+
+  User.filter(:born_after => "10/4/2010")
+  #=> User.active.born_after(#<Date: 4910947/2,0,2299161>)
+
+See QueryableWith::ClassMethods#query_set for more information.
+
+== Another Example
+
+  class User < ActiveRecord::Base
     query_set :search do
-      # If queried by either :first_name or :last_name, execute a LIKE query on those columns.
+      # If queried by :name, execute a LIKE query on both the :first_name and :last_name columns.
       # User.scoped(:conditions => ["(users.first_name LIKE ?) OR (users.last_name LIKE ?)", ...])
-      queryable_with :first_name, :last_name, :wildcard => true
+      queryable_with :name, :columns => [ :first_name, :last_name ], :wildcard => true
       
       # If queried by :username, execute a LIKE query on the the email column.
       # User.scoped(:conditions => ["(users.email LIKE ?)", ...])      
@@ -35,20 +50,19 @@ An ActiveRecord library for creating scopes on the fly and combining them into r
     end
   end
 
-  User.filter
-  #=> User.active
-
-  User.filter(:email => "gthreepwood@gmail.com")
-  #=> User.active.scoped(:conditions => { :email => "gthreepwood@gmail.com" })
-
-  User.filter(:born_after => "04/03/2010", :email => "athreepwood@gmail.com")
-  #=> User.active.born_after("04/03/2010").scoped(:conditions => { :email => "gthreepwood@gmail.com" })
-
-  User.search(:first_name => "Guy", :last_name => "Three") 
-  #=> User.scoped(:conditions => { :first_name => "%Guy%" }).scoped(:conditions => { :last_name => "%Three%" })
+  User.search(:name => ["Guy", "Three"])
+  #=> User.scoped(:conditions => ["(users.first_name LIKE ?) OR (users.last_name LIKE ?) OR ...", "%Guy%", "%Three%", "%Guy%", "%Three%"]
 
   User.search(:username => "gthree")
   #=> User.scoped(:conditions => { :email => "%gthree%"})
+
+== Installation and usage
+
+QueryableWith is available as a gem. It has a dependency on ActiveRecord, which it will automatically extend with
+the necessary class methods when required. It is not yet compatible with Rails3.
+
+  gem install queryable_with
+  require 'queryable_with'
 
 == License
 

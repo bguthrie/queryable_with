@@ -1,17 +1,29 @@
 require 'active_record'
 
+# See README.rdoc for an extended introduction. The QueryableWith::ClassMethods#query_set, 
+# QueryableWith::QuerySet#queryable_with and QueryableWith::QuerySet#add_scope methods may also
+# be of interest.
 module QueryableWith
-  
-  def self.included(active_record)
+
+  def self.included(active_record) # :nodoc:
     active_record.send :extend, QueryableWith::ClassMethods
   end
   
   module ClassMethods
-    def query_sets
+    def query_sets # :nodoc:
       read_inheritable_attribute(:query_sets) || write_inheritable_hash(:query_sets, {})
     end
     
-    def query_set(set_name, options={}, &block)
+    # Defines a query set with the given name. This has the effect of defining a method that calls
+    # every implicit or explicit scope added to that query set.
+    #
+    # When a block is given, that block is evaluated in the context of either a newly-created query
+    # set or (in the case of inherited classes) the pre-existing set of that name. See 
+    # QueryableWith::QuerySet#queryable_with and QueryableWith::QuerySet#add_scope for more details.
+    #
+    # When <tt>parent</tt> is given as an option, the new query set will inherit all of the scopes from
+    # the named parent.
+    def query_set(set_name, options={}, &block) # :yields:
       set = query_set_for(set_name, options).tap { |s| s.instance_eval(&block) if block_given? }
       
       class_eval <<-RUBY
@@ -23,21 +35,41 @@ module QueryableWith
     
     protected
     
-      def query_set_for(set_name, options)
+      def query_set_for(set_name, options) # :nodoc:
         query_sets[set_name.to_s] || query_sets.store(set_name.to_s, QueryableWith::QuerySet.new(options))
       end
   end
   
   class QuerySet
     
-    def initialize(options={})
+    def initialize(options={}) # :nodoc:
       @queryables = []
       
       if options.has_key?(:parent)
-        @queryables << QueryableWith::AddedScope.new(options[:parent])
+        @queryables << QueryableWith::ImplicitScopeParameter.new(options[:parent])
       end
     end
     
+    # Make this QuerySet queryable with the named parameter(s). If no other options are given,
+    # this will result in a query on either the column or (if defined) scope of the same
+    # name of the base scope and values passed to #query. It also accepts the following options:
+    #
+    # * <tt>scope</tt> - Map the incoming parameter to this scope. The argument by be a symbol (name of the 
+    #   scope), a Hash (scope conditions) or a lambda.
+    # * <tt>column</tt> - Map the incoming parameter to this column.
+    # * <tt>default</tt> - Default the incoming parameter to this value even if it isn't provided.
+    # * <tt>wildcard</tt> - Use a SQL LIKE query with the incoming parameter. Used only if the <tt>scope</tt>
+    #   option is absent or a block is not provided.
+    #
+    # If a block is provided, incoming parameters to the query will be passed through that function first. 
+    # For example,
+    #
+    #   queryable_with(:company_name, :scope => :by_company) do |name| 
+    #     Company.find_by_name(name)
+    #   end
+    #
+    # will attempt to look up a company name first, then pass it to a pre-defined scope called 
+    # <tt>by_company</tt>.
     def queryable_with(*expected_parameters, &block)
       options = expected_parameters.extract_options!
       
@@ -46,11 +78,20 @@ module QueryableWith
       end
     end
     
+    # Add a scope that is always applied to any calls to #query. This may be a symbol (the name of
+    # the scope to add), a Hash (scope conditions) or a lambda. Useful when, for example, you only
+    # ever want to see records with an <tt>active</tt> flag set to true.
+    #
+    #   add_scope :active
+    #   add_scope :conditions => { :active => true }
     def add_scope(scope)
-      @queryables << QueryableWith::AddedScope.new(scope)
+      @queryables << QueryableWith::ImplicitScopeParameter.new(scope)
     end
     
-    def query(base_scope, params={})
+    # Applies all of the defined queryable and added scopes in this query set to the given base scope
+    # (usually an ActiveRecord class, but can also be a pre-existing NamedScope object) based on the
+    # query parameters and returns a new scope, ready to be queried.
+    def query(base_scope, params={}) # :nodoc:
       @queryables.inject(base_scope) do |scope, queryer|
         queryer.query(scope, params)
       end
@@ -58,7 +99,7 @@ module QueryableWith
     
   end
   
-  class AddedScope
+  class ImplicitScopeParameter # :nodoc:
     
     def initialize(scope)
       @scope = scope
@@ -74,7 +115,7 @@ module QueryableWith
     
   end
   
-  class QueryableParameter
+  class QueryableParameter # :nodoc:
     attr_reader :expected_parameter, :column_name
     
     def initialize(expected_parameter, options={}, &block)
@@ -134,8 +175,8 @@ module QueryableWith
   
 end
 
-module ActiveRecord
-  class Base
+module ActiveRecord # :nodoc:
+  class Base # :nodoc:
     include QueryableWith
   end
 end
