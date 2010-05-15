@@ -28,6 +28,6 @@ namespace :gem do
   end
   
   task :release => :build do
-    system "gem push queryable_with-#{QueryableWith::VERSION}"
+    system "gem push queryable_with-#{QueryableWith::Version::STRING}"
   end
 end
